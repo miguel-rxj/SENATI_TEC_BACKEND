@@ -1,0 +1,228 @@
+# ==============================================================
+#  PRUEBAS DE LA API  -  SENATI TEC
+#  Extensión de VS Code: "REST Client" (humao.rest-client)
+#  Pulsa "Send Request" sobre cada petición, EN ORDEN.
+#  Requiere haber cargado los datos de ejemplo (02_datos.sql).
+# ==============================================================
+
+@host = http://localhost:3000/api
+
+
+###################### 1. SALUD ######################
+
+### Servidor vivo
+GET {{host}}/health
+
+
+###################### 2. AUTENTICACIÓN ######################
+
+### Registro de un cliente nuevo (email aleatorio) -> 201
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Cliente de Prueba",
+  "email": "cliente{{$randomInt 1000 9999}}@correo.com",
+  "password": "Clave1234",
+  "telefono": "987654321"
+}
+
+### Registro con datos inválidos -> 400
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{ "nombre": "A", "email": "no-es-email", "password": "123" }
+
+### Registro con email repetido -> 409
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{ "nombre": "Ana Repetida", "email": "ana@correo.com", "password": "Clave1234" }
+
+### Registro intentando ser admin: el campo "rol" se IGNORA -> 201 con rol "cliente"
+POST {{host}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Intruso",
+  "email": "intruso{{$randomInt 1000 9999}}@correo.com",
+  "password": "Clave1234",
+  "rol": "admin"
+}
+
+### LOGIN ADMIN (ejecuta este primero: guarda el token) -> 200
+# @name loginAdmin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@tiendatech.com", "password": "Admin123!" }
+
+###
+@tokenAdmin = {{loginAdmin.response.body.$.token}}
+
+### LOGIN CLIENTE (Ana) -> 200
+# @name loginCliente
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "ana@correo.com", "password": "Cliente123!" }
+
+###
+@tokenCliente = {{loginCliente.response.body.$.token}}
+
+### Login con contraseña incorrecta -> 401
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{ "email": "ana@correo.com", "password": "ClaveMala99" }
+
+### Perfil con token -> 200
+GET {{host}}/auth/perfil
+Authorization: Bearer {{tokenCliente}}
+
+### Perfil sin token -> 401
+GET {{host}}/auth/perfil
+
+
+###################### 3. CATEGORÍAS ######################
+
+### Listar (público) -> 200
+GET {{host}}/categorias
+
+### Obtener una -> 200
+GET {{host}}/categorias/1
+
+### Obtener inexistente -> 404
+GET {{host}}/categorias/999
+
+### Crear (admin) -> 201
+# @name crearCategoria
+POST {{host}}/categorias
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "nombre": "Monitores {{$randomInt 100 999}}", "descripcion": "Pantallas y monitores" }
+
+###
+@catId = {{crearCategoria.response.body.$.id}}
+
+### Crear como CLIENTE -> 403
+POST {{host}}/categorias
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{ "nombre": "Hackeada" }
+
+### Crear sin token -> 401
+POST {{host}}/categorias
+Content-Type: application/json
+
+{ "nombre": "Sin token" }
+
+### Crear con nombre repetido -> 409
+POST {{host}}/categorias
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "nombre": "Laptops" }
+
+### Editar (admin) -> 200
+PUT {{host}}/categorias/{{catId}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "descripcion": "Monitores gamer y de oficina" }
+
+### Eliminar la categoría recién creada (admin) -> 200
+DELETE {{host}}/categorias/{{catId}}
+Authorization: Bearer {{tokenAdmin}}
+
+### Eliminar categoría que tiene productos -> 409 (integridad referencial)
+DELETE {{host}}/categorias/1
+Authorization: Bearer {{tokenAdmin}}
+
+
+###################### 4. PRODUCTOS ######################
+
+### Listar (público, con categoría incluida) -> 200
+GET {{host}}/productos
+
+### Filtrar por categoría -> 200
+GET {{host}}/productos?categoria=2
+
+### Buscar por texto -> 200
+GET {{host}}/productos?q=lenovo
+
+### Paginación -> 200
+GET {{host}}/productos?pagina=1&limite=3
+
+### Obtener uno -> 200
+GET {{host}}/productos/1
+
+### Obtener inexistente -> 404
+GET {{host}}/productos/999
+
+### Crear (admin) -> 201
+# @name crearProducto
+POST {{host}}/productos
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{
+  "categoria_id": 3,
+  "nombre": "Webcam C920",
+  "marca": "Logitech",
+  "descripcion": "Cámara Full HD con micrófono",
+  "precio": 349.90,
+  "stock": 12,
+  "imagen_url": "https://placehold.co/400x300?text=Webcam"
+}
+
+###
+@prodId = {{crearProducto.response.body.$.id}}
+
+### Crear con datos inválidos -> 400
+POST {{host}}/productos
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "categoria_id": 3, "nombre": "x", "precio": -10, "stock": 1.5 }
+
+### Crear con categoría inexistente -> 409
+POST {{host}}/productos
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "categoria_id": 999, "nombre": "Producto huérfano", "precio": 100 }
+
+### Crear como CLIENTE -> 403
+POST {{host}}/productos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{ "categoria_id": 3, "nombre": "Producto hackeado", "precio": 1 }
+
+### Editar parcialmente (solo precio y stock) -> 200
+PUT {{host}}/productos/{{prodId}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "precio": 299.90, "stock": 20 }
+
+### Editar sin enviar nada -> 400
+PUT {{host}}/productos/{{prodId}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{}
+
+### Eliminar (desactiva el producto) -> 200
+DELETE {{host}}/productos/{{prodId}}
+Authorization: Bearer {{tokenAdmin}}
+
+### Ya no aparece en el catálogo público -> 404
+GET {{host}}/productos/{{prodId}}
+
+### Eliminar como CLIENTE -> 403
+DELETE {{host}}/productos/1
+Authorization: Bearer {{tokenCliente}}

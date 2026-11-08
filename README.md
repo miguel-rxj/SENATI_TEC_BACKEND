@@ -13,6 +13,12 @@ npm run dev
 
 Comprueba que funciona abriendo http://localhost:3000/api/health
 
+## Base de datos
+
+Ejecutar en el SQL Editor de Supabase, en este orden:
+`01_schema.sql` → `02_datos.sql` → `04_pedidos.sql`
+(`04_pedidos.sql` crea las funciones transaccionales de los pedidos).
+
 ## Probar los endpoints
 
 Abre `pruebas.http` en VS Code con la extensión **REST Client** y pulsa *Send Request*.
@@ -29,6 +35,14 @@ También sirve Postman o Thunder Client con las mismas URLs.
 | POST, PUT, DELETE | /api/categorias | admin |
 | GET | /api/productos (?categoria=&q=&pagina=&limite=), /api/productos/:id | público |
 | POST, PUT, DELETE | /api/productos | admin |
+| POST | /api/pedidos | usuario autenticado |
+| GET | /api/pedidos/mis-pedidos | usuario autenticado (solo los suyos) |
+| GET | /api/pedidos/:id | dueño del pedido o admin |
+| GET | /api/pedidos (?estado=&pagina=&limite=) | admin |
+| PUT | /api/pedidos/:id/estado | admin |
+
+Flujo de estados: `pendiente → pagado → enviado → entregado`. Se puede
+cancelar desde `pendiente` o `pagado` (el stock se devuelve).
 
 ## Estructura
 

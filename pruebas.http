@@ -226,3 +226,162 @@ GET {{host}}/productos/{{prodId}}
 ### Eliminar como CLIENTE -> 403
 DELETE {{host}}/productos/1
 Authorization: Bearer {{tokenCliente}}
+
+
+###################### 5. PEDIDOS ######################
+# Requiere haber ejecutado 04_pedidos.sql en Supabase.
+# El cliente envía SOLO producto y cantidad: el precio y el total los calcula la base de datos.
+
+### Crear pedido como cliente (Ana) -> 201, estado "pendiente", stock descontado
+# @name crearPedido
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{
+  "direccion_envio": "Av. Túpac Amaru 1234, Independencia, Lima",
+  "items": [
+    { "producto_id": 3, "cantidad": 1 },
+    { "producto_id": 5, "cantidad": 2 }
+  ]
+}
+
+###
+@pedidoId = {{crearPedido.response.body.$.id}}
+
+### Sin stock suficiente -> 409 (no se guarda nada)
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{
+  "direccion_envio": "Av. Túpac Amaru 1234, Independencia, Lima",
+  "items": [ { "producto_id": 4, "cantidad": 50 } ]
+}
+
+### Datos inválidos (sin productos, dirección corta) -> 400
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{ "direccion_envio": "corta", "items": [] }
+
+### Producto inexistente -> 409
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{
+  "direccion_envio": "Av. Túpac Amaru 1234, Independencia, Lima",
+  "items": [ { "producto_id": 999, "cantidad": 1 } ]
+}
+
+### Crear pedido sin token -> 401
+POST {{host}}/pedidos
+Content-Type: application/json
+
+{ "direccion_envio": "Av. Túpac Amaru 1234, Lima", "items": [ { "producto_id": 1, "cantidad": 1 } ] }
+
+### Mis pedidos (solo los de Ana) -> 200
+GET {{host}}/pedidos/mis-pedidos
+Authorization: Bearer {{tokenCliente}}
+
+### Ver un pedido propio -> 200
+GET {{host}}/pedidos/{{pedidoId}}
+Authorization: Bearer {{tokenCliente}}
+
+### Ana intenta ver el pedido 2 (es de Luis) -> 404
+GET {{host}}/pedidos/2
+Authorization: Bearer {{tokenCliente}}
+
+### Ana intenta listar TODOS los pedidos -> 403
+GET {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+
+### Admin lista todos los pedidos (con datos del cliente) -> 200
+GET {{host}}/pedidos
+Authorization: Bearer {{tokenAdmin}}
+
+### Admin filtra por estado + paginación -> 200
+GET {{host}}/pedidos?estado=pendiente&pagina=1&limite=5
+Authorization: Bearer {{tokenAdmin}}
+
+### Admin ve cualquier pedido -> 200
+GET {{host}}/pedidos/2
+Authorization: Bearer {{tokenAdmin}}
+
+### Cliente intenta cambiar el estado -> 403
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{ "estado": "pagado" }
+
+### Estado inválido -> 400
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "volando" }
+
+### Salto no permitido (pendiente -> entregado) -> 409
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "entregado" }
+
+### Admin: pendiente -> pagado -> 200
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "pagado" }
+
+### Admin: pagado -> enviado -> 200
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "enviado" }
+
+### Admin: enviado -> entregado -> 200
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "entregado" }
+
+### Un pedido entregado ya no se puede cancelar -> 409
+PUT {{host}}/pedidos/{{pedidoId}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "cancelado" }
+
+### Crear otro pedido para probar la CANCELACIÓN (devuelve el stock)
+# @name crearPedido2
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{
+  "direccion_envio": "Av. Túpac Amaru 1234, Independencia, Lima",
+  "items": [ { "producto_id": 6, "cantidad": 3 } ]
+}
+
+###
+@pedidoId2 = {{crearPedido2.response.body.$.id}}
+
+### Stock del producto 6 (bajó en 3)
+GET {{host}}/productos/6
+
+### Admin cancela el pedido -> 200
+PUT {{host}}/pedidos/{{pedidoId2}}/estado
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: application/json
+
+{ "estado": "cancelado" }
+
+### Stock del producto 6 (volvió a subir en 3)
+GET {{host}}/productos/6

@@ -67,3 +67,34 @@ export const listarProductosQuery = z.object({
   pagina: z.coerce.number().int().min(1).default(1),
   limite: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+// ---------- Pedidos ----------
+// El cliente envía SOLO qué quiere y cuántos. El precio y el total los calcula
+// la base de datos, así nadie puede manipularlos desde el navegador.
+export const crearPedidoSchema = z.object({
+  direccion_envio: z
+    .string()
+    .trim()
+    .min(10, 'La dirección debe tener al menos 10 caracteres')
+    .max(300, 'La dirección no puede superar 300 caracteres'),
+  items: z
+    .array(
+      z.object({
+        producto_id: z.number().int().positive(),
+        cantidad: z.number().int().min(1, 'La cantidad mínima es 1').max(99, 'La cantidad máxima es 99'),
+      })
+    )
+    .min(1, 'El pedido debe tener al menos un producto')
+    .max(50, 'Un pedido no puede tener más de 50 productos distintos'),
+});
+
+// 'pendiente' no es un destino válido: es el estado con el que nace el pedido
+export const cambiarEstadoSchema = z.object({
+  estado: z.enum(['pagado', 'enviado', 'entregado', 'cancelado'], 'Estado inválido'),
+});
+
+export const listarPedidosQuery = z.object({
+  estado: z.enum(['pendiente', 'pagado', 'enviado', 'entregado', 'cancelado']).optional(),
+  pagina: z.coerce.number().int().min(1).default(1),
+  limite: z.coerce.number().int().min(1).max(100).default(20),
+});

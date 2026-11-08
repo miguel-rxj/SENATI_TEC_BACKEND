@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.routes.js';
 import categoriasRoutes from './routes/categorias.routes.js';
 import productosRoutes from './routes/productos.routes.js';
+import pedidosRoutes from './routes/pedidos.routes.js';
 import { notFound, errorHandler } from './middlewares/errores.js';
 
 const app = express();
@@ -11,7 +12,7 @@ const app = express();
 const origenes = (process.env.FRONTEND_URL ?? 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim());
-  
+
 app.use(cors({ origin: origenes }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -23,6 +24,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/categorias', categoriasRoutes);
 app.use('/api/productos', productosRoutes);
+app.use('/api/pedidos', pedidosRoutes);
 
 app.use(notFound);      // siempre después de las rutas
 app.use(errorHandler);  // siempre al final

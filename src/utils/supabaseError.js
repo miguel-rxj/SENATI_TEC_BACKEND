@@ -12,6 +12,12 @@ const MAPA = {
 
 export function lanzarSiError(error) {
   if (!error) return;
+
+  // Errores lanzados a propósito por las funciones SQL (RAISE EXCEPTION).
+  // Sus mensajes ya están escritos para el usuario: "Stock insuficiente para ..."
+  if (error.code === 'P0001') throw new ApiError(409, error.message);
+  if (error.code === 'P0002') throw new ApiError(404, error.message);
+
   const [status, mensaje] = MAPA[error.code] ?? [500, 'Error de base de datos'];
   if (status === 500) console.error('Supabase:', error);
   throw new ApiError(status, mensaje);
